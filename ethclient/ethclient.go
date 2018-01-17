@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
@@ -191,6 +192,25 @@ func (ec *Client) TransactionByHash(ctx context.Context, hash common.Hash) (tx *
 	}
 	setSenderFromServer(json.tx, json.From, json.BlockHash)
 	return json.tx, json.BlockNumber == nil, nil
+}
+
+// TransactionInclusionBlock returns block number for the transaction with the given hash.
+func (ec *Client) TransactionInclusionBlock(ctx context.Context, hash common.Hash) (blockNumber uint64, err error) {
+	var json *rpcTransaction
+	err = ec.c.CallContext(ctx, &json, "eth_getTransactionByHash", hash)
+	if err != nil {
+		return 0, err
+	} else if json == nil {
+		return 0, ethereum.NotFound
+	} else if _, r, _ := json.tx.RawSignatureValues(); r == nil {
+		return 0, fmt.Errorf("server returned transaction without signature")
+	}
+	setSenderFromServer(json.tx, json.From, json.BlockHash)
+	blockNumber, err = strconv.ParseUint(*json.BlockNumber, 0, 64)
+	if err != nil {
+		return 0, err
+	}
+	return blockNumber, nil
 }
 
 // TransactionSender returns the sender address of the given transaction. The transaction
